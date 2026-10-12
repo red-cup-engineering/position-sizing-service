@@ -1,0 +1,35 @@
+{
+  "type": "MarkdownJsnodeOperationPackageFabricationReceipt",
+  "version": 1,
+  "sourceDigest": "sha256:ff446cab2ecfc031e7f706ff64dbea8dc84a3880c17cf5c369edac0fce66c675",
+  "specificationDigest": "sha256:b72c22b87ae5fed53a90cd34ab59806a82d20976dcf4da53d885517d9aeedd59",
+  "workOrder": "size-position-sleeve-fabrication-work-order.md",
+  "fabricatedPackage": {
+    "name": "@red-cup-engineering/scratch-size-position-sleeve-20260904-service",
+    "version": "0.1.0",
+    "destination": "/tmp/claude-1000/-home-emsenn-info/0fbcd5bf-4b2d-45fb-867e-4d0865931cd2/scratchpad/scratch-size-position-sleeve-20260904-service",
+    "registry": "https://registry.561.group",
+    "published": true
+  },
+  "friction": {
+    "kind": "missing-capability",
+    "script": "jsnode-fabrication (fabricate_jsnode_operation_package / create-jsnode-operation-package-service)",
+    "observed": "The line births a package name whose leaf must equal '<operation-basename>-service', requires the destination directory's basename to equal that same leaf, and can only birth into an ABSENT destination with the generic operation-package shape (package.json, README.md, scripts/<op>.mjs, test/*.test.mjs) -- no src/ directory, so an operation cannot import a sibling src/ module. It has no mode to add one script to an existing, differently-named, differently-shaped package (DESTINATION_EXISTS with no in-place mode, per the publish-package/dispatch-agents skill's already-filed friction of 2026-09-04).",
+    "expected": "A mode to fabricate one operation script directly into an existing package's scripts/ directory (or a src/-carrying package shape) so a script that legitimately needs to import a sibling src/ module (per the house import-stratification law: scripts import scripts and src) does not have to duplicate that module's logic inline for the sake of a standalone scratch birth.",
+    "workaround": "Fabricated a standalone scratch package (@red-cup-engineering/scratch-size-position-sleeve-20260904-service@0.1.0) with the sleeve algebra inlined (duplicating position-sizing-service's own kellyFraction/continuousKellyFraction/playStyleForGoal/MAX_DEFENSIBLE_KELLY_MULTIPLE from src/sizing.mjs) so the scratch birth's own tests could pass with no src/ directory to import from. After the birth+publish receipt below, the exported sizePosition function was hand-ported into position-sizing-service/src/sleeve.mjs, rewiring the inlined duplicate math to a real `import { kellyFraction, continuousKellyFraction, playStyleForGoal, MAX_DEFENSIBLE_KELLY_MULTIPLE } from \"./sizing.mjs\"` -- the shipped package carries no duplicated Kelly arithmetic; only the discarded scratch publish does.",
+    "secondFriction": {
+      "kind": "missing-capability",
+      "script": "@red-cup-engineering/energy-bank's src/decimal.mjs",
+      "observed": "The module exports parse/rescale/sum/add/cmp/isZero/isNegative/negate/format/totalOf -- an additive ledger primitive set (ledger postings are always summed, never scaled) -- with no scalar-multiply or scalar-divide operation.",
+      "expected": "sizePosition needs an exact-decimal stake = (float Kelly fraction) x (exact-decimal riskCapital). No decimal scalar-multiply primitive exists anywhere in the house computer-data custody to compose for this.",
+      "workaround": "Computed the product in double precision (consistent with this section's own numeric-discipline rule that a statistic-derived quantity is already approximate) and enforced the 'stake never exceeds riskCapital' guarantee with an exact decimal.cmp() against the caller's own riskCapital string, never trusting the float product past that boundary. Documented in src/sleeve.mjs's own module JSDoc."
+    }
+  },
+  "realPackage": {
+    "name": "@red-cup-engineering/position-sizing-service",
+    "toVersion": "0.2.0",
+    "filesAdded": ["src/sleeve.mjs", "src/sleeve.d.ts", "scripts/size-position.mjs", "test/size-position.test.mjs", "README.md"],
+    "portedFrom": "scratch-size-position-sleeve-20260904-service's scripts/scratch-size-position-sleeve-20260904.mjs (sizePosition function body and test/size-position.test.mjs, both text-identical apart from the import-path rewiring described above and two test fixtures corrected for float-precision and continuous-edge-refuses-by-leverage, see git history)"
+  },
+  "recordedAt": "2026-09-04T20:20:00.000Z"
+}

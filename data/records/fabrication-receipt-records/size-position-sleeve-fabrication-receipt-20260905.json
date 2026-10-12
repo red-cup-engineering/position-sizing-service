@@ -1,0 +1,33 @@
+{
+  "type": "MarkdownJsnodeOperationPackageFabricationReceipt",
+  "version": 1,
+  "sourceDigest": "sha256:64b2fc2a51edc6119d4bd5d8402d64585e85a47463c8251fba99b367bd779c1b",
+  "specificationDigest": "sha256:0a04430c09e19d659bdb77c36001f2b1be565c5a6125d95cb87a64906d381ed8",
+  "workOrder": "size-position-sleeve-fabrication-work-order.md",
+  "priorReceipt": "size-position-sleeve-fabrication-receipt.json",
+  "fabricatedPackage": {
+    "name": "@red-cup-engineering/scratch-size-position-sleeve-20260905-service",
+    "version": "0.1.0",
+    "destination": "/tmp/claude-1000/-home-emsenn-info/2545b093-a586-40aa-b6f2-55d02faf69a5/scratchpad/lot-i-fab-dest/scratch-size-position-sleeve-20260905-service",
+    "registry": "https://registry.561.group",
+    "published": true,
+    "assays": ["staged-dependency-installation", "syntax", "the-rule", "tests", "pack", "clean-installation", "import-face", "command-face", "help"],
+    "allAssaysPassed": true
+  },
+  "changeSummary": "Lot I (2026-09-05, the fintech-under-energy-descent note, sections 2 and 3.5): added two optional declared sleeve attributes -- sleeve.stage (an integer 1-5, the five stages of collapse at which the sleeve's own venue, counterparty, or rail stops) and sleeve.barrierJoules ({amount, unit: \"joules\"|\"kwh\", usdPerKwh, asOf}), the survival barrier stated in energy rather than only USD. Both are carried through unchanged on every sizing result, admitted or refused, never affecting the sizing math itself. When barrierJoules is declared, its USD value (converted through 3,600,000 J/kWh where the unit is joules) is reported as barrierUsd.fromJoules, authoritative against the sleeve's own declared survivalCapital (barrierUsd.declared); a disagreement above one percent is reported as barrierUsd.mismatchAboveOnePercent/mismatchFraction, never silently resolved in either direction. Additive only: the four prior fields (fraction, stake, regime, kellyMultipleApplied, goal) and the three prior refusal reasons are unchanged.",
+  "friction": {
+    "kind": "missing-capability",
+    "script": "jsnode-fabrication (fabricate_jsnode_operation_package / create-jsnode-operation-package-service)",
+    "observed": "Repeats the 2026-09-04 friction on this same package: the line can only birth into an ABSENT destination with the generic operation-package shape (package.json, README.md, scripts/<op>.mjs, test/*.test.mjs) -- no src/ directory -- and additionally requires the destination directory's own basename to equal the package's leaf name exactly, refusing DESTINATION_PACKAGE_IDENTITY_MISMATCH for a lot-prefixed scratch directory name (e.g. lot-i-scratch-size-position-sleeve-20260905-service). The destination had to be nested one level deeper (lot-i-fab-dest/scratch-size-position-sleeve-20260905-service) to satisfy both the exact-leaf-name requirement and the house rule that a lot's scratchpad files carry its own prefix.",
+    "expected": "A mode to fabricate one operation script directly into an existing package's scripts/ directory (still filed as the standing friction from 2026-09-04's receipt), and a destination-naming affordance that does not require the scratch directory's own basename to exactly equal the package leaf, so a lot-prefixed scratch directory name does not need an extra nesting level.",
+    "workaround": "Nested the destination one level under a lot-prefixed parent directory (lot-i-fab-dest/), fabricated and published the scratch package there, then hand-ported the updated sizePosition function body (stage/barrierJoules threading, barrierUsdFromJoules/barrierUsdReport helpers) into position-sizing-service/src/sleeve.mjs, rewiring the inlined duplicate Kelly math back to the real `import { kellyFraction, continuousKellyFraction, playStyleForGoal, MAX_DEFENSIBLE_KELLY_MULTIPLE } from \"./sizing.mjs\"` exactly as the 2026-09-04 port did. The shipped package carries no duplicated Kelly arithmetic; only the discarded scratch publish does."
+  },
+  "realPackage": {
+    "name": "@red-cup-engineering/position-sizing-service",
+    "fromVersion": "0.2.0",
+    "toVersion": "0.3.0",
+    "filesChanged": ["src/sleeve.mjs", "src/sleeve.d.ts", "test/size-position.test.mjs", "README.md"],
+    "portedFrom": "scratch-size-position-sleeve-20260905-service's scripts/scratch-size-position-sleeve-20260905.mjs (the stage/barrierJoules logic; the shared test cases across both files assert the same behavior, verified passing in both the scratch package (18 tests) and the shipped package (53 tests, 43 baseline + 10 new))"
+  },
+  "recordedAt": "2026-09-05T06:35:00.000Z"
+}
