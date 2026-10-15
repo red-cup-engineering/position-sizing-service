@@ -1,6 +1,6 @@
 {
   "name": "@red-cup-engineering/position-sizing-service",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "type": "module",
   "description": "Growth-optimal position sizing: Kelly (discrete and continuous), the CRRA relaxation governing the written-off-stake case where log utility's infinite ruin penalty does not apply, quantile-optimal leverage, the Dubins-Savage bold/timid decision, drawdown probability, daily-reset leverage decay, and a bounded-risk-sleeve envelope over all of it.",
   "keywords": [
@@ -17,11 +17,9 @@
   },
   "exports": {
     ".": {
-      "types": "./src/sizing.d.ts",
       "default": "./src/sizing.mjs"
     },
     "./sleeve": {
-      "types": "./src/sleeve.d.ts",
       "default": "./src/sleeve.mjs"
     },
     "./size-position": "./scripts/size-position.mjs",
@@ -31,7 +29,7 @@
     "size-position": "scripts/size-position.mjs"
   },
   "dependencies": {
-    "@red-cup-engineering/energy-bank": "workspace:*"
+    "@red-cup-engineering/energy-bank": "0.3.2"
   },
   "engines": {
     "node": ">=24"
@@ -41,5 +39,6 @@
     "src",
     "scripts",
     "README.md"
-  ]
+  ],
+  "private": false
 }
