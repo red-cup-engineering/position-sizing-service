@@ -507,6 +507,92 @@ export function ladderScenarios({ bands, bets } = {}) {
 }
 
 /**
+ * Reservation prices on a ladder of nested binary claims on ONE underlying: the price at which one more contract
+ * leaves expected utility unchanged, given what is already held.
+ *
+ * The underlying settles in exactly one of `bands` (probabilities summing to 1, in increasing order); strike j
+ * (0-based, between band j and band j+1) is the claim "above strike j": YES pays 1 in bands s > j, NO in bands
+ * s <= j. Holdings give the wealth in each band at settlement,
+ *
+ *   W_s = wealth + sum_j ( yes_j 1[s > j] + no_j 1[s <= j] ),
+ *
+ * and one more YES of strike j bought at c leaves W_s + 1[s > j] - c. Its reservation price is the c solving
+ *
+ *   sum_s pi_s u(W_s + 1[s > j] - c) = sum_s pi_s u(W_s),
+ *
+ * u the CRRA utility of relative risk aversion gamma (gamma = 1 is log utility, Kelly; for small stakes a
+ * fractional Kelly multiple k is gamma = 1/k). Because the claims are nested, a position on one strike moves every
+ * strike's reservation price through the bands they share: holding YES above one strike lowers the YES bid on it
+ * and on its neighbours, and raises their NO bids. The left side falls strictly in c, so the root is found by
+ * bisection on [0, 1] (60 halvings: exact to 1e-15 of the payout).
+ *
+ * @param {{bands: number[], wealth: number, holdings?: {yes?: number[], no?: number[]}, relativeRiskAversion?: number}} input
+ * @returns {{yes: number[], no: number[]}} reservation prices per strike, as fractions of the payout
+ */
+export function ladderReservationPrices({ bands, wealth, holdings = {}, relativeRiskAversion = 1 } = {}) {
+  const { pi, base, utility } = ladderState({ bands, wealth, holdings, relativeRiskAversion });
+  const expected = (shift) => pi.reduce((sum, p, s) => (p > 0 ? sum + p * utility(base[s] + shift(s)) : sum), 0);
+  const before = expected(() => 0);
+  const solve = (pays) => {
+    let lo = 0, hi = 1;
+    for (let i = 0; i < 60; i += 1) { const c = (lo + hi) / 2; if (expected((s) => (pays(s) ? 1 : 0) - c) >= before) lo = c; else hi = c; }
+    return lo;
+  };
+  const strikes = pi.length - 1;
+  return {
+    yes: Array.from({ length: strikes }, (_, j) => solve((s) => s > j)),
+    no: Array.from({ length: strikes }, (_, j) => solve((s) => s <= j)),
+  };
+}
+
+/**
+ * The number of contracts of one ladder claim to buy at one price that maximizes expected utility given holdings
+ * (bands, wealth, holdings and gamma as in `ladderReservationPrices`): the n >= 0 maximizing
+ * sum_s pi_s u(W_s + n (pays_s - price)), concave in n, found by doubling then bisection, at most `max`.
+ *
+ * @param {{bands: number[], wealth: number, holdings?: {yes?: number[], no?: number[]}, relativeRiskAversion?: number,
+ *   strike: number, side: "yes"|"no", price: number, max?: number}} input
+ * @returns {number} whole contracts
+ */
+export function ladderOptimalContracts({ bands, wealth, holdings = {}, relativeRiskAversion = 1, strike, side, price, max = 1_000_000 } = {}) {
+  const { pi, base, utility } = ladderState({ bands, wealth, holdings, relativeRiskAversion });
+  if (!Number.isInteger(strike) || strike < 0 || strike >= pi.length - 1) throw new RangeError(`sizing: strike must index the ladder, got ${strike}`);
+  if (side !== 'yes' && side !== 'no') throw new TypeError('sizing: side is yes or no');
+  const c = probability(price, 'price'), pays = (s) => (side === 'yes' ? s > strike : s <= strike);
+  const value = (n) => {
+    let sum = 0;
+    for (let s = 0; s < pi.length; s += 1) { if (!(pi[s] > 0)) continue; const w = base[s] + n * ((pays(s) ? 1 : 0) - c); if (w <= 0) return -Infinity; sum += pi[s] * utility(w); }
+    return sum;
+  };
+  const gain = (n) => value(n + 1) > value(n);
+  if (!gain(0)) return 0;
+  let hi = 1;
+  while (hi < max && gain(hi)) hi = Math.min(max, hi * 2);
+  if (gain(hi)) return hi; // only at the cap
+  let lo = Math.floor(hi / 2); // gain(lo) holds, gain(hi) fails: the optimum is in (lo, hi]
+  while (hi - lo > 1) { const mid = Math.floor((lo + hi) / 2); if (gain(mid)) lo = mid; else hi = mid; }
+  return hi;
+}
+
+function ladderState({ bands, wealth, holdings, relativeRiskAversion }) {
+  if (!Array.isArray(bands) || bands.length < 2) throw new TypeError('sizing: a ladder has at least two bands');
+  const pi = bands.map((p, s) => probability(p, `bands[${s}]`));
+  const mass = pi.reduce((a, p) => a + p, 0);
+  if (Math.abs(mass - 1) > 1e-9) throw new RangeError(`sizing: band probabilities sum to ${mass}, not 1`);
+  const gamma = positive(relativeRiskAversion, 'relativeRiskAversion');
+  const strikes = pi.length - 1, yes = holdings.yes ?? new Array(strikes).fill(0), no = holdings.no ?? new Array(strikes).fill(0);
+  if (yes.length !== strikes || no.length !== strikes) throw new TypeError('sizing: holdings name every strike');
+  const base = pi.map((_, s) => {
+    let w = positive(wealth, 'wealth');
+    for (let j = 0; j < strikes; j += 1) w += finite(yes[j], `yes[${j}]`) * (s > j ? 1 : 0) + finite(no[j], `no[${j}]`) * (s <= j ? 1 : 0);
+    if (w <= 0) throw new RangeError(`sizing: holdings leave no wealth in band ${s}`);
+    return w;
+  });
+  const utility = gamma === 1 ? Math.log : (w) => Math.pow(w, 1 - gamma) / (1 - gamma);
+  return { pi, base, utility };
+}
+
+/**
  * Scenarios for mutually independent bets: all 2^n joint outcomes with product probabilities (n ≤ 20).
  * @param {number[]} winProbabilities
  */

@@ -463,3 +463,30 @@ test('marginals cannot prove disjoint losses; explicit independence permits simu
  assert.throws(()=>modelRiskScenarios({opportunities:[...independent.slice(0,2),{...independent[2],outcomeStructure:'exclusive-losses'}],modes:[]}),/explicit-consistent/);
  assert.throws(()=>modelRiskScenarios({opportunities:ladderOf('E',.5),modes:[]}),/marginals-exceed/);
 });
+
+test('ladder reservation prices: a fair price for a small stake, moved through the bands a holding shares', async () => {
+  const { ladderReservationPrices, ladderOptimalContracts } = await import('../src/sizing.mjs');
+  // one strike: the reservation price of a single contract on large wealth is the probability, less a tiny premium
+  const one = ladderReservationPrices({ bands: [0.4, 0.6], wealth: 10_000 });
+  assert.ok(one.yes[0] < 0.6 && 0.6 - one.yes[0] < 1e-4);
+  assert.ok(one.no[0] < 0.4 && 0.4 - one.no[0] < 1e-4);
+  // three strikes; holding YES above the middle strike lowers every YES bid it shares bands with and raises the NO bids
+  const bands = [0.1, 0.2, 0.4, 0.3], flat = ladderReservationPrices({ bands, wealth: 100 });
+  const long = ladderReservationPrices({ bands, wealth: 100, holdings: { yes: [0, 40, 0], no: [0, 0, 0] } });
+  for (let j = 0; j < 3; j += 1) {
+    assert.ok(flat.yes[j] + flat.no[j] < 1, 'a concave utility never bids both sides to a sum above the payout');
+    assert.ok(long.yes[j] < flat.yes[j]);
+    assert.ok(long.no[j] > flat.no[j]);
+  }
+  // the reservation price is where one more contract leaves expected log wealth unchanged
+  const W = (s, c) => 100 + (s > 0 ? 1 : 0) - c, eu = (c) => bands.reduce((sum, p, s) => sum + p * Math.log(W(s, c)), 0);
+  assert.ok(Math.abs(eu(flat.yes[0]) - bands.reduce((sum, p) => sum + p * Math.log(100), 0)) < 1e-12);
+  // the level size: Kelly stakes (p - c)/(1 - c) of wealth; half as much again at twice the risk aversion
+  const kelly = ladderOptimalContracts({ bands: [0.4, 0.6], wealth: 1000, strike: 0, side: 'yes', price: 0.5 });
+  assert.ok(Math.abs(kelly - 400) <= 1, `log-optimal contracts ${kelly}`);
+  const half = ladderOptimalContracts({ bands: [0.4, 0.6], wealth: 1000, strike: 0, side: 'yes', price: 0.5, relativeRiskAversion: 2 });
+  assert.ok(half > 150 && half < 250, `gamma 2 contracts ${half}`);
+  assert.equal(ladderOptimalContracts({ bands: [0.4, 0.6], wealth: 1000, strike: 0, side: 'yes', price: 0.61 }), 0);
+  assert.equal(ladderOptimalContracts({ bands: [0.4, 0.6], wealth: 1000, strike: 0, side: 'yes', price: 0.5, max: 25 }), 25);
+  assert.throws(() => ladderReservationPrices({ bands: [0.5, 0.6], wealth: 1 }), /sum to/u);
+});
