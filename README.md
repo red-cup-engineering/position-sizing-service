@@ -18,6 +18,24 @@ only real ruin is liability beyond the stake or touching survival capital).
   `leveragedGrowthRate`/`volatilityDragBreakeven`/`volatilityLeverageParity` (daily-reset
   leverage decay), `sizingAdvice`, and `clampToLong`. Statistics, not money: floating-point by
   design (see Numeric discipline below).
+  The joint and ladder layer: `jointKellyForCorrelatedOutcomes` / `jointKellyForScenarioReturns`
+  (simultaneous bets over a joint scenario set), `ladderScenarios`, `ladderReservationPrices` and
+  `ladderOptimalContracts` (nested claims on one underlying, given holdings; both take the `carry` of
+  the capital a contract commits), `nestedClaimArbitrage` (a ladder's riskless books: a lower strike's
+  YES ask below a higher strike's YES bid), and the shared-model-error mixture
+  (`modelRiskScenarios`, `estimateModelRiskModes`).
+  Capital and time: `capitalTimeAllocation` sizes opportunities whose capital settlement locks, under
+  Little's law, and returns the hurdle λ, the shadow price of capital per unit time set by the
+  opportunity set itself (the slope of the growth-against-capital Pareto frontier). λ·holding is each
+  trade's carry. Capital that does not bind has no hurdle and turnover does not matter; capital that
+  binds prefers quick turnover exactly as far as return per capital-time warrants.
+  `binaryContractReturns` gives one contract's return scenarios.
+  A stake given to a strategy by its record: `recordKellyFraction` stakes the growth-optimal fraction
+  of the record read with the Krichevsky–Trofimov half count at the floor. Nothing is staked until the
+  record has earned back half a total loss; a run of small wins never reads as riskless; the stake
+  tends to the strategy's Kelly fraction. `strategyEvidence` runs that stake predictably over the
+  record, and its wealth is an anytime-valid e-value against "no edge" (Ville: it reaches k with
+  chance at most 1/k), so the stake and the evidence are one bet and no threshold is set.
 - **`sleeve`** (`./sleeve`) — `sizePosition`, the bounded-risk-sleeve envelope over the sizing
   primitives above: full Kelly by default on the risk sleeve alone (capped at
   `MAX_DEFENSIBLE_KELLY_MULTIPLE`), refusing rather than sizing or clamping when liability

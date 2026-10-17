@@ -44,6 +44,12 @@ const positive = (value, label) => {
   return n;
 };
 
+const nonNegative = (value, label) => {
+  const n = finite(value, label);
+  if (n < 0) throw new RangeError(`sizing: ${label} must be non-negative, got ${n}`);
+  return n;
+};
+
 const probability = (value, label) => {
   const n = finite(value, label);
   if (n < 0 || n > 1) throw new RangeError(`sizing: ${label} must lie in [0,1], got ${n}`);
@@ -518,24 +524,27 @@ export function ladderScenarios({ bands, bets } = {}) {
  *
  * and one more YES of strike j bought at c leaves W_s + 1[s > j] - c. Its reservation price is the c solving
  *
- *   sum_s pi_s u(W_s + 1[s > j] - c) = sum_s pi_s u(W_s),
+ *   sum_s pi_s u(W_s + 1[s > j] - c) - carry · c · M = sum_s pi_s u(W_s),   M = sum_s pi_s u'(W_s),
  *
  * u the CRRA utility of relative risk aversion gamma (gamma = 1 is log utility, Kelly; for small stakes a
- * fractional Kelly multiple k is gamma = 1/k). Because the claims are nested, a position on one strike moves every
- * strike's reservation price through the bands they share: holding YES above one strike lowers the YES bid on it
- * and on its neighbours, and raises their NO bids. The left side falls strictly in c, so the root is found by
- * bisection on [0, 1] (60 halvings: exact to 1e-15 of the payout).
+ * fractional Kelly multiple k is gamma = 1/k). `carry` is the growth the committed price would earn elsewhere
+ * while settlement locks it: the hurdle rate of capital times the holding time (`capitalTimeAllocation`), priced at
+ * the expected marginal utility of money M; 0 when capital does not bind. Because the claims are nested, a position
+ * on one strike moves every strike's reservation price through the bands they share: holding YES above one strike
+ * lowers the YES bid on it and on its neighbours, and raises their NO bids. The left side falls strictly in c, so the
+ * root is found by bisection on [0, 1] (60 halvings: exact to 1e-15 of the payout).
  *
- * @param {{bands: number[], wealth: number, holdings?: {yes?: number[], no?: number[]}, relativeRiskAversion?: number}} input
+ * @param {{bands: number[], wealth: number, holdings?: {yes?: number[], no?: number[]}, relativeRiskAversion?: number, carry?: number}} input
  * @returns {{yes: number[], no: number[]}} reservation prices per strike, as fractions of the payout
  */
-export function ladderReservationPrices({ bands, wealth, holdings = {}, relativeRiskAversion = 1 } = {}) {
-  const { pi, base, utility } = ladderState({ bands, wealth, holdings, relativeRiskAversion });
+export function ladderReservationPrices({ bands, wealth, holdings = {}, relativeRiskAversion = 1, carry = 0 } = {}) {
+  const { pi, base, utility, marginalUtility } = ladderState({ bands, wealth, holdings, relativeRiskAversion });
+  const cost = nonNegative(carry, 'carry') * marginalUtility;
   const expected = (shift) => pi.reduce((sum, p, s) => (p > 0 ? sum + p * utility(base[s] + shift(s)) : sum), 0);
   const before = expected(() => 0);
   const solve = (pays) => {
     let lo = 0, hi = 1;
-    for (let i = 0; i < 60; i += 1) { const c = (lo + hi) / 2; if (expected((s) => (pays(s) ? 1 : 0) - c) >= before) lo = c; else hi = c; }
+    for (let i = 0; i < 60; i += 1) { const c = (lo + hi) / 2; if (expected((s) => (pays(s) ? 1 : 0) - c) - cost * c >= before) lo = c; else hi = c; }
     return lo;
   };
   const strikes = pi.length - 1;
@@ -547,20 +556,21 @@ export function ladderReservationPrices({ bands, wealth, holdings = {}, relative
 
 /**
  * The number of contracts of one ladder claim to buy at one price that maximizes expected utility given holdings
- * (bands, wealth, holdings and gamma as in `ladderReservationPrices`): the n >= 0 maximizing
- * sum_s pi_s u(W_s + n (pays_s - price)), concave in n, found by doubling then bisection, at most `max`.
+ * (bands, wealth, holdings, gamma and carry as in `ladderReservationPrices`): the n >= 0 maximizing
+ * sum_s pi_s u(W_s + n (pays_s - price)) - carry · n · price · M, concave in n, found by doubling then bisection, at
+ * most `max`.
  *
  * @param {{bands: number[], wealth: number, holdings?: {yes?: number[], no?: number[]}, relativeRiskAversion?: number,
- *   strike: number, side: "yes"|"no", price: number, max?: number}} input
+ *   strike: number, side: "yes"|"no", price: number, max?: number, carry?: number}} input
  * @returns {number} whole contracts
  */
-export function ladderOptimalContracts({ bands, wealth, holdings = {}, relativeRiskAversion = 1, strike, side, price, max = 1_000_000 } = {}) {
-  const { pi, base, utility } = ladderState({ bands, wealth, holdings, relativeRiskAversion });
+export function ladderOptimalContracts({ bands, wealth, holdings = {}, relativeRiskAversion = 1, strike, side, price, max = 1_000_000, carry = 0 } = {}) {
+  const { pi, base, utility, marginalUtility } = ladderState({ bands, wealth, holdings, relativeRiskAversion });
   if (!Number.isInteger(strike) || strike < 0 || strike >= pi.length - 1) throw new RangeError(`sizing: strike must index the ladder, got ${strike}`);
   if (side !== 'yes' && side !== 'no') throw new TypeError('sizing: side is yes or no');
-  const c = probability(price, 'price'), pays = (s) => (side === 'yes' ? s > strike : s <= strike);
+  const c = probability(price, 'price'), pays = (s) => (side === 'yes' ? s > strike : s <= strike), cost = nonNegative(carry, 'carry') * marginalUtility;
   const value = (n) => {
-    let sum = 0;
+    let sum = -cost * n * c;
     for (let s = 0; s < pi.length; s += 1) { if (!(pi[s] > 0)) continue; const w = base[s] + n * ((pays(s) ? 1 : 0) - c); if (w <= 0) return -Infinity; sum += pi[s] * utility(w); }
     return sum;
   };
@@ -589,7 +599,36 @@ function ladderState({ bands, wealth, holdings, relativeRiskAversion }) {
     return w;
   });
   const utility = gamma === 1 ? Math.log : (w) => Math.pow(w, 1 - gamma) / (1 - gamma);
-  return { pi, base, utility };
+  const marginalUtility = pi.reduce((sum, p, s) => sum + p * Math.pow(base[s], -gamma), 0);
+  return { pi, base, utility, marginalUtility };
+}
+
+/**
+ * Riskless books on a ladder of nested claims, read off its book: YES above a lower strike pays in every band
+ * where YES above a higher strike pays, so it can never be worth less. When the lower strike's YES ask is below a
+ * higher strike's YES bid, buying the lower and selling the higher (buying its NO) collects the difference now and
+ * never loses at settlement: in every band the pair pays 1 or 2 for a cost below 1. These are the ladder's
+ * settled-in-advance trades: their outcome is fixed by the claims' logic, not by the underlying.
+ *
+ * @param {{strikes: {id?: string, bid: number|null, ask: number|null}[], cost?: (price: number) => number}} input
+ *   strikes in increasing strike order; YES bid and ask as fractions of the payout; `cost(price)` the per-contract
+ *   taking cost at a price (fees), 0 by default
+ * @returns {{buy: number, sell: number, ask: number, bid: number, profit: number}[]} every profitable pair, best first
+ */
+export function nestedClaimArbitrage({ strikes, cost = () => 0 } = {}) {
+  if (!Array.isArray(strikes)) throw new TypeError('sizing: strikes must be an array');
+  const pairs = [];
+  strikes.forEach((low, j) => {
+    if (low?.ask === null || low?.ask === undefined) return;
+    for (let k = j + 1; k < strikes.length; k += 1) {
+      const high = strikes[k];
+      if (high?.bid === null || high?.bid === undefined) continue;
+      const ask = probability(low.ask, `strikes[${j}].ask`), bid = probability(high.bid, `strikes[${k}].bid`);
+      const profit = bid - ask - cost(ask) - cost(1 - bid);
+      if (profit > 0) pairs.push({ buy: j, sell: k, ask, bid, profit });
+    }
+  });
+  return pairs.sort((a, b) => b.profit - a.profit);
 }
 
 /**
@@ -999,6 +1038,178 @@ export function estimateModelRiskModes({ settledGroups, prior = MODEL_RISK_PRIOR
     logPosterior: previous, iterations, converged, groups: groups.length,
     failures: groups.reduce((s, g) => s + g.failures, 0), responsibilities,
   };
+}
+
+// ── capital that settlement locks ──────────────────────────────────────────────────────────
+
+/**
+ * Growth-optimal use of capital that settlement locks: which opportunities to take and how much of each, when cash
+ * committed to one cannot serve another until it settles.
+ *
+ * Model. Opportunity i offers trades at `rate` a_i per unit time; each commits a fraction f_i of wealth for its
+ * `holding` time τ_i and returns R_i per unit committed (`scenarios` {probability, return}; a fully collateralized
+ * claim never returns below −1). Over a long run the renewal-reward theorem gives the growth rate of log wealth
+ *
+ *   g(f) = Σ_i a_i E log(1 + f_i R_i)
+ *
+ * (trades held at once add in log wealth to second order in their sizes), and Little's law gives the capital
+ * committed on average, Σ_i a_i τ_i f_i, which cannot exceed the committable `capital` (1: all of wealth). The
+ * program is concave; its KKT conditions are
+ *
+ *   E[R_i / (1 + f_i R_i)] = λ τ_i  where f_i > 0,   E[R_i] ≤ λ τ_i  where f_i = 0,   λ ≥ 0,   λ (capital − Σ a_i τ_i f_i) = 0.
+ *
+ * λ, the `hurdle`, is the shadow price of capital: the log growth one more unit of committed capital earns per unit
+ * time at the margin, set by the opportunity set itself. It is the slope of the Pareto frontier of growth against
+ * capital committed, where no use of capital can earn more without another earning less. A trade's carry is λ τ_i,
+ * the growth its capital would earn elsewhere while settlement holds it; `ladderReservationPrices` takes it as
+ * `carry`. When capital does not bind, λ = 0 and every opportunity takes its own Kelly fraction (turnover does not
+ * matter); when it binds, quick turnover is preferred exactly as far as return per unit of capital-time warrants.
+ *
+ * Method. For a given λ each f_i solves its own monotone condition (the left side falls in f_i), by bisection; the
+ * capital used falls in λ, so λ is found by bisection between 0 and max_i E[R_i]/τ_i, where nothing is taken.
+ *
+ * @param {{opportunities: {id?: string, rate: number, holding: number, scenarios: {probability: number, return: number}[]}[], capital?: number}} input
+ *   rate and holding in the same unit of time
+ * @returns {{hurdle: number, binding: boolean, growthRate: number, capitalUsed: number,
+ *   allocations: {id: string, fraction: number, capitalShare: number, growthRate: number, returnPerCapitalTime: number}[]}}
+ */
+export function capitalTimeAllocation({ opportunities, capital = 1 } = {}) {
+  if (!Array.isArray(opportunities)) throw new TypeError('sizing: opportunities must be an array');
+  const C = positive(capital, 'capital');
+  const classes = opportunities.map((o, i) => {
+    const rate = positive(o?.rate, `opportunities[${i}].rate`), holding = positive(o?.holding, `opportunities[${i}].holding`);
+    if (!Array.isArray(o.scenarios) || o.scenarios.length === 0) throw new TypeError(`sizing: opportunities[${i}] needs scenarios`);
+    let mass = 0;
+    const scenarios = o.scenarios.map((sc, k) => { const p = probability(sc?.probability, `opportunities[${i}].scenarios[${k}].probability`); mass += p; return { p, r: finite(sc.return, `opportunities[${i}].scenarios[${k}].return`) }; });
+    if (Math.abs(mass - 1) > 1e-9) throw new RangeError(`sizing: opportunities[${i}] scenario probabilities sum to ${mass}, not 1`);
+    const worst = Math.min(...scenarios.filter((sc) => sc.p > 0).map((sc) => sc.r));
+    // A stake its worst return would overdraw is never taken; a claim that cannot lose is bounded only by the hurdle.
+    const cap = worst < 0 ? 1 / -worst : Infinity;
+    return { id: o.id ?? `opportunity-${i}`, rate, holding, scenarios, cap, mean: scenarios.reduce((s, sc) => s + sc.p * sc.r, 0) };
+  });
+  const marginal = (c, f) => c.scenarios.reduce((s, { p, r }) => (p > 0 ? s + (p * r) / (1 + f * r) : s), 0);
+  const fractionAt = (c, lambda) => {
+    const target = lambda * c.holding;
+    if (marginal(c, 0) <= target) return 0;
+    let lo = 0, hi = c.cap;
+    if (!Number.isFinite(hi)) {
+      if (!(target > 0)) return Infinity; // free capital and a claim that cannot lose: unbounded
+      hi = 1; while (marginal(c, hi) > target) hi *= 2;
+    }
+    for (let i = 0; i < 200 && hi - lo > 1e-15 * Math.max(1, hi); i += 1) { const mid = (lo + hi) / 2; if (marginal(c, mid) > target) lo = mid; else hi = mid; }
+    return (lo + hi) / 2;
+  };
+  const usage = (lambda) => classes.reduce((s, c) => s + c.rate * c.holding * fractionAt(c, lambda), 0);
+  let hurdle = 0;
+  const binding = classes.length > 0 && usage(0) > C * (1 + 1e-12);
+  if (binding) {
+    // At max E[R]/τ nothing is taken, so the capital used falls from above C to 0 between the ends.
+    let lo = 0, hi = Math.max(...classes.map((c) => Math.max(0, c.mean) / c.holding));
+    for (let i = 0; i < 200 && hi - lo > 1e-15 * Math.max(1e-300, hi); i += 1) { const mid = (lo + hi) / 2; if (usage(mid) > C) lo = mid; else hi = mid; }
+    hurdle = hi;
+  }
+  const allocations = classes.map((c) => {
+    const fraction = fractionAt(c, hurdle);
+    const growth = c.rate * c.scenarios.reduce((s, { p, r }) => (p > 0 ? s + p * Math.log1p(fraction * r) : s), 0);
+    return { id: c.id, fraction, capitalShare: c.rate * c.holding * fraction, growthRate: growth, returnPerCapitalTime: c.mean / c.holding };
+  });
+  return { hurdle, binding, growthRate: allocations.reduce((s, a) => s + a.growthRate, 0), capitalUsed: allocations.reduce((s, a) => s + a.capitalShare, 0), allocations };
+}
+
+/**
+ * The return scenarios of one binary contract bought at `price` (a fraction of its payout), with `fee` per
+ * contract, when it pays with `probability`: per unit committed, (1 − price − fee)/(price + fee) or −1.
+ */
+export function binaryContractReturns({ probability: p, price, fee = 0 }) {
+  const win = probability(p, 'probability'), cost = probability(price, 'price') + nonNegative(fee, 'fee');
+  if (!(cost > 0) || cost >= 1) throw new RangeError('sizing: a contract costing nothing or its whole payout has no return');
+  return [{ probability: win, return: (1 - cost) / cost }, { probability: 1 - win, return: -1 }];
+}
+
+// ── a stake given to a strategy by its record ──────────────────────────────────────────────
+
+/**
+ * The fraction of a stake to give a strategy, from its record of returns.
+ *
+ * Record. The strategy's return on the capital it was given, once per settlement (positions that settle together
+ * count once, so successive terms are conditionally independent), never below `floor` (−1 when fully
+ * collateralized: it cannot lose more than it was given).
+ *
+ * Allocation. The φ maximizing the stake's log growth over the record read with the Krichevsky–Trofimov half count
+ * at the floor:
+ *
+ *   φ* = argmax_{φ ∈ [0, min(1, −1/floor))}  ½ log(1 + φ·floor) + Σ_i log(1 + φ x_i).
+ *
+ * The record says what the strategy has done; the half count says what the support allows it to do that a short
+ * record cannot rule out: lose everything it is given. ½ is the Krichevsky–Trofimov (Jeffreys) count, the one whose
+ * sequential log-loss regret is minimax (½ log n + O(1); Krichevsky & Trofimov 1981, Cover's universal portfolio
+ * with a Dirichlet(½) prior), not a tuning constant. Consequences, with no threshold:
+ *   - nothing is staked until the record has earned back half a total loss (Σ x_i > −floor/2 at φ = 0);
+ *   - a record of small wins never reads as riskless, which is how a strategy that sells tails looks before its tail;
+ *   - as the record grows the half count's weight vanishes and φ* tends to the strategy's Kelly fraction.
+ * No borrowing: φ ≤ 1 (Kalshi has no margin).
+ *
+ * Method. The objective is concave; its derivative falls in φ, so φ* is found by Newton steps safeguarded by
+ * bisection, from `start` when a nearby answer is known.
+ *
+ * @param {{returns: number[], floor?: number, start?: number}} input
+ * @returns {{fraction: number, expectedLogGrowth: number, count: number}} expectedLogGrowth: per settlement, at φ*
+ */
+export function recordKellyFraction({ returns, floor = -1, start = 0 } = {}) {
+  if (!Array.isArray(returns)) throw new TypeError('sizing: returns must be an array');
+  const lower = finite(floor, 'floor');
+  if (lower >= 0) throw new RangeError('sizing: a floor at or above 0 is a record that cannot lose');
+  const xs = returns.map((x, i) => { const v = finite(x, `returns[${i}]`); if (v < lower) throw new RangeError(`sizing: returns[${i}] = ${v} is below the floor ${lower}`); return v; });
+  const top = Math.min(1, -1 / lower), points = [...xs, lower], weights = [...xs.map(() => 1), 0.5];
+  const slope = (phi) => points.reduce((s, x, k) => s + (weights[k] * x) / (1 + phi * x), 0);
+  const curvature = (phi) => points.reduce((s, x, k) => s - (weights[k] * x * x) / (1 + phi * x) ** 2, 0);
+  const growth = (phi) => points.reduce((s, x, k) => s + weights[k] * Math.log1p(phi * x), 0) / (xs.length + 0.5);
+  if (slope(0) <= 0) return { fraction: 0, expectedLogGrowth: 0, count: xs.length };
+  // The floor term sends the slope to −∞ at φ = −1/floor; below 1 it is the no-borrowing bound.
+  const edge = top * (1 - 1e-12);
+  if (top < -1 / lower && slope(edge) >= 0) return { fraction: edge, expectedLogGrowth: growth(edge), count: xs.length };
+  let lo = 0, hi = edge, phi = Math.min(Math.max(start, 0), edge);
+  for (let i = 0; i < 200; i += 1) {
+    const g = slope(phi);
+    if (g > 0) lo = phi; else hi = phi;
+    if (hi - lo < 1e-13) break;
+    const step = phi - g / curvature(phi);
+    phi = step > lo && step < hi ? step : (lo + hi) / 2;
+  }
+  const fraction = (lo + hi) / 2;
+  return { fraction, expectedLogGrowth: growth(fraction), count: xs.length };
+}
+
+/**
+ * A strategy's record as evidence and as a stake: before each settlement the stake is `recordKellyFraction` of the
+ * record so far, and the evidence is the wealth of a bettor that staked exactly that on each settlement before
+ * seeing it,
+ *
+ *   E_n = Π_i (1 + φ_i x_i),   φ_i from x_1..x_{i−1}.
+ *
+ * If the strategy has no edge (E[x_i | past] ≤ 0), E is a nonnegative supermartingale, so by Ville's inequality the
+ * chance it ever reaches k is at most 1/k: E is an anytime-valid e-value against "no edge", read at any time and as
+ * often as wanted (testing by betting: Shafer 2021; Waudby-Smith & Ramdas 2024). The stake and the evidence are the
+ * same bet, so a record that earns no evidence earns no stake.
+ *
+ * Incremental: pass the returned `state` back with the next returns.
+ *
+ * @param {{returns: number[], floor?: number, state?: {returns: number[], evidence: number, fraction: number}}} input
+ * @returns {{fraction: number, evidence: number, count: number, stakes: number[], state: {returns: number[], evidence: number, fraction: number}}}
+ */
+export function strategyEvidence({ returns, floor = -1, state = { returns: [], evidence: 1, fraction: 0 } } = {}) {
+  if (!Array.isArray(returns)) throw new TypeError('sizing: returns must be an array');
+  const record = [...state.returns], stakes = [];
+  let { evidence, fraction } = state;
+  for (const [i, value] of returns.entries()) {
+    const x = finite(value, `returns[${i}]`);
+    if (x < finite(floor, 'floor')) throw new RangeError(`sizing: returns[${i}] = ${x} is below the floor ${floor}`);
+    stakes.push(fraction);
+    evidence *= 1 + fraction * x;
+    record.push(x);
+    fraction = recordKellyFraction({ returns: record, floor, start: fraction }).fraction;
+  }
+  return { fraction, evidence, count: record.length, stakes, state: { returns: record, evidence, fraction } };
 }
 
 // ── internals ────────────────────────────────────────────────────────────────────────────
