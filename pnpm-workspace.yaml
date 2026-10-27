@@ -1,0 +1,2 @@
+minimumReleaseAgeExclude:
+  - '@red-cup-engineering/exact-number-data-service@0.1.7'
