@@ -7,12 +7,15 @@
  */
 
 import { parse, cmp, format } from "@red-cup-engineering/energy-bank/decimal";
+import { decimalOfRational, expandDecimalNotation, rationalOfDecimal } from "@red-cup-engineering/exact-number-data-service/decimal-string";
+import { divide, ratCompare, ratIsZero, ratMultiply, ratNegate, ratOne, ratSign, ratSubtract, ratZero, toNumber } from "@red-cup-engineering/exact-number-data-service/exact-number";
 import { kellyFraction, continuousKellyFraction, playStyleForGoal, MAX_DEFENSIBLE_KELLY_MULTIPLE } from "./sizing.mjs";
 
 /** 1 kWh = 3.6 MJ exactly (SI), used to convert a joules-denominated barrier to kWh. */
-const JOULES_PER_KWH = 3600000;
+const JOULES_PER_KWH = rationalOfDecimal("3600000");
 /** Above this fraction, a declared USD survival barrier disagreeing with its joule-derived figure is reported as a datum. */
-const BARRIER_MISMATCH_THRESHOLD = 0.01;
+const BARRIER_MISMATCH_THRESHOLD = rationalOfDecimal("0.01");
+const MONEY_ROUNDING = "half-away-from-zero";
 /** The five stages of collapse (Orlov), per social-history-science-services-section's glossary term. */
 const COLLAPSE_STAGES = new Set([1, 2, 3, 4, 5]);
 const BARRIER_UNITS = new Set(["joules", "kwh"]);
@@ -71,15 +74,38 @@ function requireBarrierJoules(value, label) {
 /**
  * The USD value of a joule/kWh-denominated barrier, at the barrier's own declared price.
  * @param {{amount: object, unit: "joules"|"kwh", usdPerKwh: object}} barrierJoules
- * @returns {object} an energy-bank decimal
+ * @returns {{value: object, arithmetic: object}} an energy-bank decimal and its exact calculation
  */
 function barrierUsdFromJoules(barrierJoules) {
-  const amountKwh = barrierJoules.unit === "joules"
-    ? Number(format(barrierJoules.amount)) / JOULES_PER_KWH
-    : Number(format(barrierJoules.amount));
-  const usdPerKwhNumber = Number(format(barrierJoules.usdPerKwh));
+  const amount = rationalOfDecimal(format(barrierJoules.amount));
+  const usdPerKwh = rationalOfDecimal(format(barrierJoules.usdPerKwh));
+  const kwhDivisor = barrierJoules.unit === "joules" ? JOULES_PER_KWH : ratOne;
+  const unroundedUsd = divide(ratMultiply(amount, usdPerKwh), kwhDivisor);
   const places = Math.max(barrierJoules.usdPerKwh.places, 2);
-  return parse((amountKwh * usdPerKwhNumber).toFixed(places));
+  const value = parse(decimalOfRational(unroundedUsd, places, { rounding: MONEY_ROUNDING }));
+  return {
+    value,
+    arithmetic: { amount, kwhDivisor, usdPerKwh, unroundedUsd,
+      roundedUsd: format(value), places, rounding: MONEY_ROUNDING },
+  };
+}
+
+/**
+ * Lossy display only. The exact ratio remains in the result and decides the
+ * threshold. Make nonrepresentable display values explicit rather than letting
+ * two separately overflowing decimal-to-Number conversions yield NaN.
+ */
+function displayRational(q) {
+  try {
+    return { value: toNumber(q), projection: "finite" };
+  } catch (error) {
+    if (!(error instanceof RangeError)) throw error;
+    const negative = ratSign(q) < 0;
+    const magnitude = negative ? ratNegate(q) : q;
+    return ratCompare(magnitude, ratOne) > 0
+      ? { value: negative ? -Infinity : Infinity, projection: "overflow" }
+      : { value: negative ? -0 : 0, projection: "underflow" };
+  }
 }
 
 /**
@@ -88,21 +114,28 @@ function barrierUsdFromJoules(barrierJoules) {
  * datum here rather than silently resolved.
  * @param {{amount: object, unit: "joules"|"kwh", usdPerKwh: object, asOf: string}} barrierJoules
  * @param {object} survivalCapital an energy-bank decimal
- * @returns {{fromJoules: string, declared: string, asOf: string, mismatchFraction: number, mismatchAboveOnePercent: boolean}}
+ * @returns {{fromJoules: string, declared: string, asOf: string, mismatchFraction: number, mismatchFractionProjection: string, mismatchAboveOnePercent: boolean, arithmetic: object}}
  */
 function barrierUsdReport(barrierJoules, survivalCapital) {
-  const fromJoulesDecimal = barrierUsdFromJoules(barrierJoules);
-  const fromJoulesNumber = Number(format(fromJoulesDecimal));
-  const declaredNumber = Number(format(survivalCapital));
-  const mismatchFraction = declaredNumber === 0
-    ? (fromJoulesNumber === 0 ? 0 : Infinity)
-    : Math.abs(fromJoulesNumber - declaredNumber) / declaredNumber;
+  const derived = barrierUsdFromJoules(barrierJoules);
+  const fromJoules = rationalOfDecimal(format(derived.value));
+  const declared = rationalOfDecimal(format(survivalCapital));
+  const difference = ratSubtract(fromJoules, declared);
+  const absoluteDifference = ratSign(difference) < 0 ? ratNegate(difference) : difference;
+  const nonzeroOverZero = ratIsZero(declared) && !ratIsZero(absoluteDifference);
+  const exactMismatch = nonzeroOverZero ? null
+    : ratIsZero(declared) ? ratZero : divide(absoluteDifference, declared);
+  const display = nonzeroOverZero
+    ? { value: Infinity, projection: "zero-denominator" }
+    : displayRational(exactMismatch);
   return {
-    fromJoules: format(fromJoulesDecimal),
+    fromJoules: format(derived.value),
     declared: format(survivalCapital),
     asOf: barrierJoules.asOf,
-    mismatchFraction,
-    mismatchAboveOnePercent: mismatchFraction > BARRIER_MISMATCH_THRESHOLD,
+    mismatchFraction: display.value,
+    mismatchFractionProjection: display.projection,
+    mismatchAboveOnePercent: nonzeroOverZero || ratCompare(exactMismatch, BARRIER_MISMATCH_THRESHOLD) > 0,
+    arithmetic: { ...derived.arithmetic, absoluteDifference, mismatchFraction: exactMismatch },
   };
 }
 
@@ -123,6 +156,10 @@ function barrierUsdReport(barrierJoules, survivalCapital) {
  * @returns {{admitted: true, fraction: number, stake: string, regime: "bold"|"timid"|"indifferent"|"growth", kellyMultipleApplied: number, goal: number|null, stage: 1|2|3|4|5|null, barrierUsd: {fromJoules: string, declared: string, asOf: string, mismatchFraction: number, mismatchAboveOnePercent: boolean}|null}|{admitted: false, reason: string, goal: number|null, stage: 1|2|3|4|5|null, barrierUsd: {fromJoules: string, declared: string, asOf: string, mismatchFraction: number, mismatchAboveOnePercent: boolean}|null}} The sizing record, or a refusal datum naming why nothing was sized.
  * @throws {TypeError} When a required field is missing or the wrong type.
  * @throws {RangeError} When a numeric or decimal field lies outside its admissible range.
+ * @description A computed stake carries `arithmetic` evidence: the statistical
+ * fraction's shortest-decimal interpretation, exact capital/product, rounded
+ * amount, places and rounding mode. Barrier reports carry their exact unit
+ * conversion and mismatch ratio; `mismatchFraction` is only a lossy display.
  */
 export function sizePosition({ edge, sleeve, liabilityBeyondStake, kellyMultiple = 1, goal = null }) {
   if (typeof edge !== "object" || edge === null) throw new TypeError("sleeve: edge is required");
@@ -159,12 +196,26 @@ export function sizePosition({ edge, sleeve, liabilityBeyondStake, kellyMultiple
 
   const appliedMultiple = Math.min(kellyMultiple, MAX_DEFENSIBLE_KELLY_MULTIPLE);
   const fraction = kelly * appliedMultiple;
+  if (!Number.isFinite(fraction)) {
+    throw new RangeError("sleeve: final sizing fraction must be finite before monetary computation");
+  }
   const places = Math.max(riskCapital.places, 2);
-  const stakeDecimal = parse((fraction * Number(format(riskCapital))).toFixed(places));
+  // The fraction is still the original statistical estimate. Interpret its
+  // public decimal spelling exactly, without converting capital to binary64.
+  const fractionDecimal = expandDecimalNotation(fraction);
+  const exactFraction = rationalOfDecimal(fractionDecimal);
+  const exactCapital = rationalOfDecimal(format(riskCapital));
+  const unroundedStake = ratMultiply(exactFraction, exactCapital);
+  const stakeDecimal = parse(decimalOfRational(unroundedStake, places, { rounding: MONEY_ROUNDING }));
+  const arithmetic = {
+    scalarInterpretation: "ecmascript-shortest-decimal",
+    fractionDecimal, fraction: exactFraction, riskCapital: exactCapital,
+    unroundedStake, roundedStake: format(stakeDecimal), places, rounding: MONEY_ROUNDING,
+  };
 
   if (cmp(stakeDecimal, riskCapital) > 0) {
-    return { admitted: false, reason: "sized stake would exceed the sleeve's risk capital -- refused, never clamped silently", goal, stage, barrierUsd };
+    return { admitted: false, reason: "sized stake would exceed the sleeve's risk capital -- refused, never clamped silently", goal, stage, barrierUsd, arithmetic };
   }
 
-  return { admitted: true, fraction, stake: format(stakeDecimal), regime, kellyMultipleApplied: appliedMultiple, goal, stage, barrierUsd };
+  return { admitted: true, fraction, stake: format(stakeDecimal), regime, kellyMultipleApplied: appliedMultiple, goal, stage, barrierUsd, arithmetic };
 }
