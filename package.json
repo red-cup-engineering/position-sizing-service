@@ -55,5 +55,6 @@
   },
   "receivingTests": [
     "test/exact-money.test.mjs"
-  ]
+  ],
+  "packageManager": "pnpm@11.19.0"
 }

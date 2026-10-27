@@ -1,0 +1,117 @@
+lockfileVersion: '9.0'
+
+settings:
+  autoInstallPeers: true
+  excludeLinksFromLockfile: false
+
+importers:
+
+  .:
+    dependencies:
+      '@red-cup-engineering/energy-bank':
+        specifier: 0.3.3
+        version: 0.3.3
+      '@red-cup-engineering/exact-number-data-service':
+        specifier: 0.1.7
+        version: 0.1.7
+
+packages:
+
+  '@cto.af/wtf8@0.0.6':
+    resolution: {integrity: sha512-xp/zbWLXuh2WBxi9tIc+Jep7BAwLu8ETTI8xN68ks10bxOBMISs/jcu9DBEkOeGXLaTKUbA0Y2Ficx/jmmPABg==}
+    engines: {node: '>=20'}
+
+  '@red-cup-engineering/cbor-services-section@0.1.1':
+    resolution: {integrity: sha512-uUsHbXjvaFihU5JavrJpbG44Hdcg2r7zADeWgM6DO6YeIcSsAo4FrYh35pwzAqLpqQbQJrIOsDVzrccyWURu5g==}
+    engines: {node: '>=24.2.0'}
+
+  '@red-cup-engineering/computer-content-address-engineering-services-section@0.2.0':
+    resolution: {integrity: sha512-wpD6OqU0x1OXUVX59VyYYMnU11KEqSQVg8kqmLNKpkbilNKYCOaxIwpgbVf+iDWO34tjOT4uew3ukXYQSvKF9w==}
+
+  '@red-cup-engineering/computer-data-engineering-services-section@0.2.0':
+    resolution: {integrity: sha512-fHoL1GrjGExKOuVosgLfUl0HK6WVQ1EZcOrR4LkC6XN6dUBbvOtA7n+mupaqvSSErWdDENL6SCPiiApgCaUOTQ==}
+    hasBin: true
+
+  '@red-cup-engineering/computer-text-content-engineering-services-section@0.1.0':
+    resolution: {integrity: sha512-1sR6cPKd754th7xbQWaM2FFZ9MrOF1Sxkt+RLlVN0/QpvNkMZigUFLOTaQyIL+jzn8SGbD5cNZwUwCzXtVjjzg==}
+
+  '@red-cup-engineering/cryptographic-computer-data-engineering-services-section@0.3.1':
+    resolution: {integrity: sha512-5a5fFFLCntjl4f61TGxcUOVGwCyKhjup/k0f4irnsXA/BC5alsZzeij0NPf6NzAW8kAOQ9u72L7tg8L/2ZuhSA==}
+    engines: {node: '>=18'}
+    hasBin: true
+
+  '@red-cup-engineering/energy-bank@0.3.3':
+    resolution: {integrity: sha512-EOFfp7jhirIEk009UW3JEx2SZzMuVNvLjU3DTXsqyICf3F4hxTTDGCMb6evd99E3n/55PsPpN2x4N8QJxC0ZEQ==}
+    engines: {node: '>=24'}
+
+  '@red-cup-engineering/exact-number-data-service@0.1.1':
+    resolution: {integrity: sha512-D54dcxY7eqK23lktqbv0HjjNNroY2clDJ1K5TW7pWN2NBeDOGbS53yGv7sAYfToPn3YH8pKrpBVAB1URg8kcuA==}
+
+  '@red-cup-engineering/exact-number-data-service@0.1.7':
+    resolution: {integrity: sha512-9z8xczUFBMeV5iv1q98XTzWCF4VwPZ5PoDjLVlzZxOIkk6prgxef2VB6JEOi1U7lFgcSYDE1elGqL0+NB/VCLA==}
+    hasBin: true
+
+  '@red-cup-engineering/json-services-section@0.4.0':
+    resolution: {integrity: sha512-WjToogRIj9qq5VaPQ52Lao8v/rXhSX7umi+rEn0Xysnfv6qAv77llXe68wboADrpQK2micSBS3DSGJWd5CoZkg==}
+    engines: {node: '>=24.2.0'}
+
+  '@red-cup-engineering/uri-services-section@0.1.1':
+    resolution: {integrity: sha512-y5Ipia5hTOLT/0lzEX+DAC/qtfT7ey17jNT/2dh7r0fqromCUxUOQiJOYaapXXWqe79T1sCEmICjukFuLvizmw==}
+
+  cbor2@2.4.0:
+    resolution: {integrity: sha512-s6+CPoEI6tgwasK2cWMTXt5sy8Yxo4vgRmKgkJSCdKDL/0bHU3aYJoYeHRX7/oywKYA3bxcpqEYkXkrdHe0+0Q==}
+    engines: {node: '>=22'}
+
+snapshots:
+
+  '@cto.af/wtf8@0.0.6': {}
+
+  '@red-cup-engineering/cbor-services-section@0.1.1':
+    dependencies:
+      '@red-cup-engineering/cryptographic-computer-data-engineering-services-section': 0.3.1
+      '@red-cup-engineering/json-services-section': 0.4.0
+      '@red-cup-engineering/uri-services-section': 0.1.1
+      cbor2: 2.4.0
+
+  '@red-cup-engineering/computer-content-address-engineering-services-section@0.2.0':
+    dependencies:
+      '@red-cup-engineering/cbor-services-section': 0.1.1
+      '@red-cup-engineering/cryptographic-computer-data-engineering-services-section': 0.3.1
+      '@red-cup-engineering/uri-services-section': 0.1.1
+
+  '@red-cup-engineering/computer-data-engineering-services-section@0.2.0':
+    dependencies:
+      '@red-cup-engineering/cbor-services-section': 0.1.1
+      '@red-cup-engineering/computer-content-address-engineering-services-section': 0.2.0
+      '@red-cup-engineering/exact-number-data-service': 0.1.1
+      '@red-cup-engineering/json-services-section': 0.4.0
+      '@red-cup-engineering/uri-services-section': 0.1.1
+
+  '@red-cup-engineering/computer-text-content-engineering-services-section@0.1.0':
+    dependencies:
+      '@red-cup-engineering/json-services-section': 0.4.0
+
+  '@red-cup-engineering/cryptographic-computer-data-engineering-services-section@0.3.1':
+    dependencies:
+      '@red-cup-engineering/json-services-section': 0.4.0
+
+  '@red-cup-engineering/energy-bank@0.3.3':
+    dependencies:
+      '@red-cup-engineering/computer-data-engineering-services-section': 0.2.0
+      '@red-cup-engineering/computer-text-content-engineering-services-section': 0.1.0
+      '@red-cup-engineering/cryptographic-computer-data-engineering-services-section': 0.3.1
+
+  '@red-cup-engineering/exact-number-data-service@0.1.1': {}
+
+  '@red-cup-engineering/exact-number-data-service@0.1.7': {}
+
+  '@red-cup-engineering/json-services-section@0.4.0': {}
+
+  '@red-cup-engineering/uri-services-section@0.1.1':
+    dependencies:
+      '@red-cup-engineering/cryptographic-computer-data-engineering-services-section': 0.3.1
+      '@red-cup-engineering/json-services-section': 0.4.0
+
+  cbor2@2.4.0:
+    dependencies:
+      '@cto.af/wtf8': 0.0.6
