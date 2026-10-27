@@ -69,7 +69,41 @@ volatility, a Kelly fraction are all inferences from a sample, carrying estimati
 larger than any floating-point representation error. `sleeve`'s `riskCapital`, `survivalCapital`,
 and the returned `stake` are exact decimal strings (via `@red-cup-engineering/energy-bank`'s
 `decimal` module), because a rounding error in a sized stake is a lost or invented asset.
-`energy-bank/decimal` has no scalar-multiply primitive (it is a ledger built for add/sum/compare
-over postings, not scalar arithmetic against a statistic), so the fraction-times-capital product
-itself is computed in double precision like every other statistic here; only the never-exceed
-guarantee against the caller's own `riskCapital` string is an exact decimal comparison.
+`energy-bank/decimal` retains admission, canonical decimal formatting and the
+never-exceed comparison. Exact Number Data Service `0.1.7` owns rational
+multiplication, division and decimal quantization. The statistical fraction is
+interpreted through its ECMAScript shortest decimal spelling, including finite
+exponent notation, and multiplied by the complete capital amount exactly. The
+stake is rounded once, **half away from zero**, at the greater of two places and
+the original capital's supplied precision. A nonfinite final fraction is refused
+before monetary computation. A half-sized stake against `9007199254740993` is
+therefore `4503599627370496.5`, without losing a capital unit to binary64.
+
+Energy barrier quantity and declared USD/kWh price are multiplied exactly;
+joules are divided by the exact SI factor `3600000`. The resulting USD amount
+is rounded once by the same rule, at the greater of two places and the original
+price precision. The **strictly greater than 1%** mismatch decision compares
+the rounded derived barrier with the declared survival capital using exact
+rationals. The existing signed-denominator and zero-denominator conventions
+remain; neither barrier participates in the stake calculation.
+
+Every computed stake adds an `arithmetic` record naming its scalar interpretation,
+coefficient, capital, unrounded rational product, rounded amount, places and rule.
+The barrier adds its own `arithmetic` with quantity, price, conversion divisor,
+unrounded/rounded USD, absolute difference and exact mismatch ratio. Rationals
+travel as JSON-safe `{kind:"exactNumber.rational",num:"...",den:"..."}` carriers.
+This evidence describes exact arithmetic over admitted declarations; it does
+not establish that the estimated edge, capital or energy declarations are true.
+
+`barrierUsd.mismatchFraction` remains a lossy numeric presentation and never
+controls the boolean. `mismatchFractionProjection` distinguishes `finite`,
+`overflow`, `underflow` and `zero-denominator`; the exact ratio stays in
+`arithmetic.mismatchFraction`. A nonzero difference over a zero declared amount
+has no finite rational and records null there. JavaScript Infinity serializes
+to null in the existing JSON CLI, while the explicit projection state and exact
+witness preserve its meaning.
+
+The [exact-money refinement](docs/exact-money-refinement.md) links the contracts
+to their arithmetic owner and receiving cases. Statistical estimates and policy
+are preserved; source and native package qualification do not establish a live
+trade, merchant deployment, outside customer acceptance or financial settlement.

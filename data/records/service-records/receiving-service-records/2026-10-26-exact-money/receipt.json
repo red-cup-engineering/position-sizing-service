@@ -1,0 +1,62 @@
+{
+  "kind": "position-sizing.exact-money-receiving/v1",
+  "sourceBase": "a9e13607785258397dab422abd7e2b92e3980214",
+  "version": "0.5.1",
+  "toolchain": {
+    "node": "24.22.1"
+  },
+  "scope": "Exact money conversion and retained original statistical/policy contracts; no trade or payment effects",
+  "independentOracle": "Separate BigInt-pair oracle authored before source review; original immutable source fails10/12, corrected source passes12/12",
+  "commands": [
+    {
+      "command": "node test/exact-money.test.mjs",
+      "tests": 12,
+      "pass": 12,
+      "fail": 0
+    },
+    {
+      "command": "node test/size-position.test.mjs",
+      "tests": 18,
+      "pass": 18,
+      "fail": 0
+    },
+    {
+      "command": "node test/sizing.test.mjs",
+      "tests": 55,
+      "pass": 55,
+      "fail": 0
+    },
+    {
+      "command": "node test/capital-time.test.mjs",
+      "tests": 9,
+      "pass": 9,
+      "fail": 0
+    },
+    {
+      "command": "npm run check",
+      "exitCode": 0
+    },
+    {
+      "command": "npm test",
+      "testsAtFileLevel": 4,
+      "pass": 4,
+      "fail": 0
+    }
+  ],
+  "closure": {
+    "exact-number-data-service": "0.1.7",
+    "energy-bank": "0.3.3",
+    "selection": "native npm lock refresh from previously stale0.3.0 then npm ci --ignore-scripts"
+  },
+  "files": {
+    "src/sleeve.mjs": "c37f2ce6c92d2cf560172efd8de3a330c7f8be8ea83f6b810af1f4750ed3e894",
+    "test/exact-money.test.mjs": "28810a6890666174cfb9db54836e783d8ac66a880439a4e3a06da0562c12faf4",
+    "package.json": "f00e40fb5f04c3661db7cba853eb58cc869abba3a5df0b37b9403e28e4ff63a9",
+    "package-lock.json": "9fb5951077da27dde5d3a3291bcd65fea92fc98e3b4c54ab869f559f5f1c07ee"
+  },
+  "unproved": [
+    "Registry publication",
+    "Installed production consumer",
+    "Outside mathematical purchase"
+  ]
+}
