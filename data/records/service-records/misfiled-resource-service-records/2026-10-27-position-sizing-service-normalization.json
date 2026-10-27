@@ -1,0 +1,46 @@
+{
+  "id": "2026-10-27-position-sizing-service-normalization",
+  "kind": "misfiled-resources-register",
+  "by": "apply-services-section-normalization",
+  "date": "2026-10-27",
+  "moved": [
+    {
+      "from": "data/records/fabrication-receipt-records/size-position-sleeve-fabrication-receipt-20260905.json",
+      "to": "data/records/service-records/fabrication-receipt-service-records/size-position-sleeve-fabrication-receipt-20260905.json",
+      "rule": "eavt-data-law",
+      "sourceSha256": "73929650b7b4b08fda2fbb47529831c617f601202daaa9e82dac71edc7bc6b81",
+      "destinationSha256": "73929650b7b4b08fda2fbb47529831c617f601202daaa9e82dac71edc7bc6b81",
+      "byteIdentical": true
+    },
+    {
+      "from": "data/records/fabrication-receipt-records/size-position-sleeve-fabrication-receipt.json",
+      "to": "data/records/service-records/fabrication-receipt-service-records/size-position-sleeve-fabrication-receipt.json",
+      "rule": "eavt-data-law",
+      "sourceSha256": "35b0a61d4a6200f910208735190c78a3f2bdbd809e146418e2b232aa928c2ddd",
+      "destinationSha256": "35b0a61d4a6200f910208735190c78a3f2bdbd809e146418e2b232aa928c2ddd",
+      "byteIdentical": true
+    },
+    {
+      "from": "data/records/fabrication-work-order-records/size-position-sleeve-fabrication-work-order.md",
+      "to": "data/records/service-records/fabrication-work-order-service-records/size-position-sleeve-fabrication-work-order.md",
+      "rule": "eavt-data-law",
+      "sourceSha256": "1348c8d5b0f9e5ae1202630aa49be73e1eb58c5aa25cb2dc767350ea7304f6a9",
+      "destinationSha256": "1348c8d5b0f9e5ae1202630aa49be73e1eb58c5aa25cb2dc767350ea7304f6a9",
+      "byteIdentical": true
+    }
+  ],
+  "owed": [
+    {
+      "rule": "stray-top-level",
+      "reason": ".npmrc/ is not an entry the services-section law knows; its owner decides where it belongs",
+      "directory": ".",
+      "count": 1
+    },
+    {
+      "rule": "stray-top-level",
+      "reason": "LICENSE/ is not an entry the services-section law knows; its owner decides where it belongs",
+      "directory": ".",
+      "count": 1
+    }
+  ]
+}
